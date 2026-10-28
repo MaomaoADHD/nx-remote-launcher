@@ -106,8 +106,13 @@ class ConnectorService {
 		const pollToken = data.pollToken as string;
 		const approvalLink = data.approveUrl as string;
 		const approveUrl = new URL(approvalLink);
-		const expiresAt = typeof data.expiresAt === 'string' ? Date.parse(data.expiresAt) : Date.now() + 600000;
-		if (approveUrl.origin !== new URL(endpoint).origin || !Number.isFinite(expiresAt)) {
+		const serverExpiry = typeof data.expiresAt === 'string' ? Date.parse(data.expiresAt) : NaN;
+		const serverDate = Date.parse(response.date || '');
+		const duration = Number.isFinite(serverExpiry) && Number.isFinite(serverDate)
+			? serverExpiry - serverDate
+			: 600000;
+		const expiresAt = Date.now() + duration;
+		if (approveUrl.origin !== new URL(endpoint).origin || duration <= 0) {
 			return { status: 502, data: { error: 'Invalid approval URL or expiry.' } };
 		}
 		this.pendingPair = { endpoint, code, pollToken, approveUrl: approvalLink, expiresAt };
@@ -204,7 +209,7 @@ class ConnectorService {
 			} catch {
 				if (response.ok) throw new Error('Invalid JSON response.');
 			}
-			return { ok: response.ok, status: response.status, data };
+			return { ok: response.ok, status: response.status, data, date: response.headers.get('date') };
 		} finally {
 			clearTimeout(timer);
 		}

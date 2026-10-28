@@ -45,11 +45,11 @@ test('pairs, syncs, and disconnects without exposing a token', async () => {
 			code: 'ABCD-1234',
 			pollToken: 'private-poll-token',
 			approveUrl: 'https://games.example/connectors/approve?code=ABCD-1234',
-			expiresAt: new Date(Date.now() + 600000).toISOString(),
+			expiresAt: new Date(Date.now() - 60000).toISOString(),
 			});
 			return new Response(new ReadableStream({
 				start(controller) { controller.enqueue(new TextEncoder().encode(body)); },
-			}));
+			}), { headers: { Date: new Date(Date.now() - 660000).toUTCString() } });
 		}
 		if (url.endsWith('/pair/poll')) return Response.json({ status: 'approved', token: 'private-device-token' });
 		if (url.endsWith('/sync')) return rejectSync
@@ -61,6 +61,7 @@ test('pairs, syncs, and disconnects without exposing a token', async () => {
 		expect(connectorService.getState().paired).toBe(false);
 		const pair = await connectorService.handle({ operation: 'pair-start', endpoint: 'https://games.example/api/connect/my-switch' });
 		expect(pair.status).toBe(200);
+		expect(pair.data.pairing.code).toBe('ABCD-1234');
 		expect(JSON.parse(requests[0].init.body)).toEqual({ deviceName: 'Nintendo Switch' });
 		expect(JSON.stringify(pair.data)).not.toContain('private-poll-token');
 		const approval = await connectorService.handle({ operation: 'pair-poll' });
