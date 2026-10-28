@@ -94,19 +94,19 @@ class ConnectorService {
 		if (this.readConfig()) return { status: 409, data: { error: 'Disconnect before pairing again.' } };
 		const endpoint = typeof value === 'string' ? parseConnectorEndpoint(value) : null;
 		if (!endpoint) return { status: 400, data: { error: 'Enter an HTTPS connector URL ending in /api/connect/slug.' } };
-		const response = await this.request(endpoint, '/pair', { device_name: 'Nintendo Switch' }, null, 20000);
+		const response = await this.request(endpoint, '/pair', { deviceName: 'Nintendo Switch' }, null, 20000);
 		if (!response.ok) return { status: response.status, data: { error: 'Pairing was rejected.' } };
 		const data = response.data;
-		const invalidCode = typeof data.code !== 'string' || typeof data.poll_token !== 'string';
-		const invalidApproval = typeof data.approve_url !== 'string' || typeof data.expires_at !== 'string';
+		const invalidCode = typeof data.code !== 'string' || typeof data.pollToken !== 'string';
+		const invalidApproval = typeof data.approveUrl !== 'string';
 		if (invalidCode || invalidApproval) {
 			return { status: 502, data: { error: 'Invalid pairing response.' } };
 		}
 		const code = data.code as string;
-		const pollToken = data.poll_token as string;
-		const approvalLink = data.approve_url as string;
+		const pollToken = data.pollToken as string;
+		const approvalLink = data.approveUrl as string;
 		const approveUrl = new URL(approvalLink);
-		const expiresAt = Date.parse(data.expires_at as string);
+		const expiresAt = typeof data.expiresAt === 'string' ? Date.parse(data.expiresAt) : Date.now() + 600000;
 		if (approveUrl.origin !== new URL(endpoint).origin || !Number.isFinite(expiresAt)) {
 			return { status: 502, data: { error: 'Invalid approval URL or expiry.' } };
 		}
@@ -131,7 +131,7 @@ class ConnectorService {
 			return { status: 200, data: { status: 'expired' } };
 		}
 		if (!this.approvedToken) {
-			const response = await this.request(pair.endpoint, '/pair/poll', { poll_token: pair.pollToken }, null, 20000);
+			const response = await this.request(pair.endpoint, '/pair/poll', { pollToken: pair.pollToken }, null, 20000);
 			if (!response.ok) return { status: response.status, data: { error: 'Pairing check failed.' } };
 			if (response.data.status === 'pending') return { status: 200, data: { status: 'pending' } };
 			if (response.data.status === 'expired') {
